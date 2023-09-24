@@ -17,19 +17,25 @@ if onClient() then
         shipList.scrollUpButton = barContainer:createButton(arrowUpRect, "", "onScrollUpButtonPressed")
         shipList.scrollUpButton.icon = "data/textures/icons/arrow-up2.png"
 
-        shipList.maxVisibleShips = math.floor((res.y - 3 * portraitHeight + 3 * padding - 2 * arrowHeight - (barIconHeight + padding + checkboxHeight)) / (portraitHeight + padding))
+        shipList.maxVisibleShips = math.floor((res.y - 3 * portraitHeight + 3 * padding - 2 * arrowHeight - (barIconHeight + padding + checkboxHeight)) /
+            (portraitHeight + padding))
 
-        arrowDownRect.lower = offset + vec2(padding, shipList.maxVisibleShips * (portraitHeight + padding) + 4 * padding + arrowHeight + barIconHeight + checkboxHeight)
+        arrowDownRect.lower = offset +
+            vec2(padding,
+                shipList.maxVisibleShips * (portraitHeight + padding) + 4 * padding + arrowHeight + barIconHeight +
+                checkboxHeight)
         arrowDownRect.upper = arrowDownRect.lower + vec2(portraitWidth, arrowHeight)
         shipList.scrollDownButton = barContainer:createButton(arrowDownRect, "", "onScrollDownButtonPressed")
         shipList.scrollDownButton.icon = "data/textures/icons/arrow-down2.png"
 
         local shipFrameRect = Rect()
         shipFrameRect.lower = vec2(res.x - portraitWidth - 2 * padding - barOffset.x, barOffset.y)
-        shipFrameRect.upper = shipFrameRect.lower + vec2(portraitWidth + 2 * padding, 3 * padding + barIconHeight + checkboxHeight)
+        shipFrameRect.upper = shipFrameRect.lower +
+            vec2(portraitWidth + 2 * padding, 3 * padding + barIconHeight + checkboxHeight)
         shipList.frame = barContainer:createFrame(shipFrameRect)
         shipList.frame.catchAllMouseInput = true
-        shipList.frame.layer = shipList.frame.layer - 1 -- the frame catches all input, make sure it is below other elements
+        shipList.frame.layer = shipList.frame.layer -
+            1 -- the frame catches all input, make sure it is below other elements
         shipList.frame.backgroundColor = ColorARGB(0.5, 0.3, 0.3, 0.3)
 
         local shipListIconRect = Rect()
@@ -69,17 +75,42 @@ if onClient() then
 
         -- buttons for orders
         orders = {}
-        table.insert(orders, {tooltip = "Undo"%_t,              icon = "data/textures/icons/undo.png",              callback = "onUndoPressed",         type = OrderButtonType.Undo})
-        table.insert(orders, {tooltip = "Patrol Sector"%_t,     icon = "data/textures/icons/back-forth.png",        callback = "onPatrolPressed",       type = OrderButtonType.Patrol})
-        table.insert(orders, {tooltip = "Attack Enemies"%_t,    icon = "data/textures/icons/crossed-rifles.png",    callback = "onAggressivePressed",   type = OrderButtonType.Attack,      stationAllowed = true})
-        table.insert(orders, {tooltip = "Repair"%_t,            icon = "data/textures/icons/health-normal.png",     callback = "onRepairPressed",       type = OrderButtonType.Repair})
+        table.insert(orders,
+            {
+                tooltip = "Undo"%_t,
+                icon = "data/textures/icons/undo.png",
+                callback = "onUndoPressed",
+                type = OrderButtonType.Undo
+            })
+        table.insert(orders,
+            {
+                tooltip = "Patrol Sector"%_t,
+                icon = "data/textures/icons/back-forth.png",
+                callback = "onPatrolPressed",
+                type = OrderButtonType.Patrol
+            })
+        table.insert(orders,
+            {
+                tooltip = "Attack Enemies"%_t,
+                icon = "data/textures/icons/crossed-rifles.png",
+                callback = "onAggressivePressed",
+                type = OrderButtonType.Attack,
+                stationAllowed = true
+            })
+        table.insert(orders,
+            {
+                tooltip = "Repair"%_t,
+                icon = "data/textures/icons/health-normal.png",
+                callback = "onRepairPressed",
+                type = OrderButtonType.Repair
+            })
 
         local sortedCommands = {}
         for type, _ in pairs(CommandFactory.getRegistry()) do
             table.insert(sortedCommands, type)
         end
 
-        table.sort(sortedCommands, function(a, b) return CommandOrder[a] < CommandOrder[b] end)
+        table.sort(sortedCommands, function (a, b) return CommandOrder[a] < CommandOrder[b] end)
 
         -- windows for special commands
         for _, type in pairs(sortedCommands) do
@@ -101,14 +132,21 @@ if onClient() then
 
             local interface = {}
             interface.command = command
-            interface.ui = command:buildUI(startPressedCallback, changeAreaPressedCallback, onRecallPressedCallback, configChangedCallback)
+            interface.ui = command:buildUI(startPressedCallback, changeAreaPressedCallback, onRecallPressedCallback,
+                configChangedCallback)
             interface.ui.current = {} -- this will be used to save the current area and config
             interface.ui.window:center()
 
-            table.insert(orders, {tooltip = interface.ui.orderName, icon = interface.ui.icon, callback = windowButtonPressedCallback, type = command.type})
+            table.insert(orders,
+                {
+                    tooltip = interface.ui.orderName,
+                    icon = interface.ui.icon,
+                    callback = windowButtonPressedCallback,
+                    type = command.type
+                })
 
             -- function that is called when the round button of the command is pressed, after selecting the ship
-            MapCommands[windowButtonPressedCallback] = function()
+            MapCommands[windowButtonPressedCallback] = function ()
                 -- hide all order windows
                 for _, window in pairs(orderWindows) do
                     window:hide()
@@ -127,7 +165,9 @@ if onClient() then
                 if not selectedPortrait.portrait.available then
                     -- show read-only ui for the active command
                     local shipOwner = Galaxy():findFaction(selectedPortrait.owner)
-                    local ret, data, descriptionArgs = shipOwner:invokeFunction("data/scripts/player/background/simulation/simulation.lua", "getCommandUIData", selectedPortrait.name)
+                    local ret, data, descriptionArgs = shipOwner:invokeFunction(
+                        "data/scripts/player/background/simulation/simulation.lua", "getCommandUIData", selectedPortrait
+                        .name)
                     if ret ~= 0 then return end
 
                     local entry = ShipDatabaseEntry(selectedPortrait.owner, selectedPortrait.name)
@@ -189,8 +229,9 @@ if onClient() then
                     areaSelection.commandCallback = MapCommands[areaSelectedCallback]
                     areaSelection.command = command
 
-                    areaSelection.clampAreaToCraft = command:isShipRequiredInArea(selectedPortrait.owner, selectedPortrait.name)
-                    local sizes = {command:getAreaSize(selectedPortrait.owner, selectedPortrait.name)}
+                    areaSelection.clampAreaToCraft = command:isShipRequiredInArea(selectedPortrait.owner,
+                        selectedPortrait.name)
+                    local sizes = { command:getAreaSize(selectedPortrait.owner, selectedPortrait.name) }
 
                     local usedSize = MapCommands.nextUsedSize or 1
                     local size = sizes[usedSize]
@@ -200,11 +241,10 @@ if onClient() then
                 else
                     areaSelection = nil
                 end
-
             end
 
             -- function that is called after the area for the command was selected
-            MapCommands[areaSelectedCallback] = function(area)
+            MapCommands[areaSelectedCallback] = function (area)
                 local selected = MapCommands.getSelectedShips()
                 local entry = ShipDatabaseEntry(selected.faction, selected.name)
                 if not entry then return end
@@ -223,7 +263,7 @@ if onClient() then
             end
 
             -- function that is called when the "Start" button of the command is pressed
-            MapCommands[startPressedCallback] = function()
+            MapCommands[startPressedCallback] = function ()
                 interface.ui.window:hide()
 
                 local selected = MapCommands.getSelectedShips()
@@ -231,14 +271,14 @@ if onClient() then
 
                 local shipOwner = Galaxy():findFaction(selected.faction)
                 shipOwner:invokeFunction("data/scripts/player/background/simulation/simulation.lua",
-                                     "startCommand",
-                                     selected.name,
-                                     interface.command.type,
-                                     config)
+                    "startCommand",
+                    selected.name,
+                    interface.command.type,
+                    config)
             end
 
             -- function that is called when the "Change Area" button of the command is pressed
-            MapCommands[changeAreaPressedCallback] = function()
+            MapCommands[changeAreaPressedCallback] = function ()
                 interface.ui.window:hide()
 
                 MapCommands[windowButtonPressedCallback]()
@@ -247,7 +287,7 @@ if onClient() then
             MapCommands[onRecallPressedCallback] = MapCommands.onRecallPressed
 
             -- function that is called when the config of the command is changed
-            MapCommands[configChangedCallback] = function()
+            MapCommands[configChangedCallback] = function ()
                 local selected = MapCommands.getSelectedShips()
                 if not selected then return end
 
@@ -267,8 +307,21 @@ if onClient() then
             ::continue::
         end
 
-        table.insert(orders, {tooltip = "Stop"%_t,              icon = "data/textures/icons/halt.png",              callback = "onStopPressed",         type = OrderButtonType.Stop,      stationAllowed = true})
-        table.insert(orders, {tooltip = "Recall Ship"%_t,       icon = "data/textures/icons/arrow-left.png",        callback = "onRecallPressed",       type = OrderButtonType.Recall})
+        table.insert(orders,
+            {
+                tooltip = "Stop"%_t,
+                icon = "data/textures/icons/halt.png",
+                callback = "onStopPressed",
+                type = OrderButtonType.Stop,
+                stationAllowed = true
+            })
+        table.insert(orders,
+            {
+                tooltip = "Recall Ship"%_t,
+                icon = "data/textures/icons/arrow-left.png",
+                callback = "onRecallPressed",
+                type = OrderButtonType.Recall
+            })
 
         shipList.orderButtons = {}
         for i, order in pairs(orders) do

@@ -1,15 +1,16 @@
 package.path = package.path .. ";data/scripts/lib/?.lua"
 package.path = package.path .. ";data/scripts/player/background/simulation/?.lua"
 package.path = package.path .. ";data/scripts/player/missions/?.lua"
+package.path = package.path .. ";data/scripts/utilities/?.lua"
 
 include("utility")
-include("receivecaptainmission")
 include("bit32")
 
 local CommandType = include("commandtype")
 local SimulationUtility = include("simulationutility")
 local CaptainUtility = include("captainutility")
 local CaptainGenerator = include("captaingenerator")
+local ScoutCaptainOperationUtility = include("scoutcaptainoperationutility")
 
 -- why do I need an instance of the class for something that should be a static method
 local positiveTraits, negativeTraits, neutralTraits = CaptainGenerator():getPossiblePerks()
@@ -100,17 +101,12 @@ function ScoutCaptainCommand:initialize()
     local parent = getParentFaction()
     local prediction = self:calculatePrediction(parent.index, self.shipName, self.area, self.config)
     self.data.prediction = prediction
-    -- predicted duration is in minutes whereas the duration used for this command (see update) is in seconds
-    self.data.duration = prediction.duration * 60
+    self.data.duration = prediction.duration
     self.data.noCaptainChance = prediction.noCaptainChance
     self.data.tier0Chance = prediction.tier0Chance
     self.data.tier1Chance = prediction.tier1Chance
     self.data.tier2Chance = prediction.tier2Chance
     self.data.tier3Chance = prediction.tier3Chance
-
-    if self.config.initializationError then
-        return "ScoutCaptain Command reports %1% test error in initialize() '%2%'!", { "1", "foo" }
-    end
 end
 
 -- this is the regularly called function to update the time passing while the command is running
@@ -168,18 +164,18 @@ function ScoutCaptainCommand:onAreaAnalysisSector(results, meta, x, y)
         eprint("Could not get sector view of (${x}, ${y})" % { x = x, y = y })
         return
     end
-    -- add relevent stations for no specialization
+    -- add relevant stations for no specialization
     local coord = fromXYToCoord(x, y)
     local relevantStations = results.totalNumRelevantStations[CaptainUtility.ClassType.None]
     results.totalNumRelevantStations[CaptainUtility.ClassType.None] = relevantStations + sectorView.numStations
     results.numRelevantStations[CaptainUtility.ClassType.None] = results.numRelevantStations
-    [CaptainUtility.ClassType.None]
+        [CaptainUtility.ClassType.None]
     results.numRelevantStations[CaptainUtility.ClassType.None][coord] = sectorView.numStations
 
     local stations = { sectorView:getStationTitles() }
     for _, station in pairs(stations) do
         -- pass a fake station to determine the supported classType
-        local classType = getClassFromStation({ title = station.text })
+        local classType = ScoutCaptainOperationUtility.getClassFromStation({ title = station.text })
         if classType then
             -- used to calculate the tier distribution of the captain
             results.totalNumRelevantStations[classType] = results.totalNumRelevantStations[classType] + 1
@@ -202,13 +198,13 @@ end
 -- return "Command cannot start because %1% doesn't fulfill requirement '%2%'!", {"Player", "Money"}
 -- calculate and register the command for an attack if necessary here
 function ScoutCaptainCommand:onStart()
-    if self.config.onStartError then
-        return "ScoutCaptain Command reports %1% test error in onStart() '%2%'!", { "3", "foo_bar" }
-    end
+    if self.data.prediction.attackLocation then
+        local time = random():getFloat(0.1, 0.75) * self.config.duration
+        local location = self.data.prediction.attackLocation
+        local x, y = location.x, location.y
 
-    if self.config.attacked then
-        self:registerForAttack({ x = 50, y = 150 }, nil, self.config.duration * 0.5,
-            "ScoutCaptain Command: Ship is attacked in sector \\s(%1%:%2%).", { "50", "150" })
+        self:registerForAttack({ x = x, y = y }, location.faction, time,
+            "Your ship '%1%' is under attack in sector \\s(%2%:%3%)!"%_T, { self.shipName, x, y })
     end
 
     local parent = getParentFaction()
@@ -222,15 +218,6 @@ end
 
 -- executed when the command is finished
 function ScoutCaptainCommand:onFinish()
-    -- replace ClassType.None with nil
-    if self.config.primaryClass == CaptainUtility.ClassType.None then
-        self.config.primaryClass = nil
-    end
-
-    if self.config.secondaryClass == CaptainUtility.ClassType.None then
-        self.config.secondaryClass = nil
-    end
-
     -- determine tier
     local tiersDistribution = {}
     tiersDistribution[-1] = self.data.prediction.noCaptainChance
@@ -241,47 +228,62 @@ function ScoutCaptainCommand:onFinish()
 
     local tier = selectByWeight(tiersDistribution)
 
-    -- generate captain
-    local captain = nil
-    local captainGenerator = CaptainGenerator()
-    if tier < 0 then
-        print("No captain was found.")
-        print("Sending player a message.")
-        return
-    elseif tier == 3 then
-        print("Tier 3 captain found, create captain with 2 classes.")
-        captain = captainGenerator:generate(tier, nil, self.config.primaryClass, self.config.secondaryClass,
-            self.config.positiveTraits, self.config.negativeTraits, self.config.neutralTraits)
-    elseif tier == 0 then
-        print("Tier 0 captain found, create captain without class.")
-        captain = captainGenerator:generate(tier, nil, nil, nil, self.config.positiveTraits, self.config.negativeTraits,
-            self.config.neutralTraits)
-    else
-        print("Captain found, create captain with 1 class.")
-        captain = captainGenerator:generate(tier, nil, self.config.primaryClass, nil, self.config.positiveTraits,
-            self.config.negativeTraits, self.config.neutralTraits)
-    end
-
-    if captain then
-        printCaptain(captain)
-    end
-
-    if tier == 3 then
-        print("Create 'A Lost Friend'-mission for the captain")
-    else
-        local class = self.config.primaryClass or CaptainUtility.ClassType.None
-        print("Make the captain hirable at a station that fits the primary class")
-    end
-
-    -- use money to hire captain
-
-    -- add captain to ship
     local faction = getParentFaction()
-    local entry = ShipDatabaseEntry(faction.index, self.shipName)
-    local crew = entry:getCrew()
+    local shipEntry = ShipDatabaseEntry(faction.index, self.shipName)
+    local sx, sy = shipEntry:getCoordinates()
+    local shipCaptain = shipEntry:getCaptain()
+    if tier < 0 then
+        faction:sendChatMessage(shipCaptain.displayName, ChatMessageType.Whisp,
+            "Sorry, boss. I couldn't find a captain matching your description."%_t)
+        faction:sendChatMessage(self.shipName, ChatMessageType.Information,
+            "%1% has finished scouting captains and is awaiting your next orders in \\s(%2%:%3%)."%_T, self.shipName,
+            sx, sy)
+        return
+    end
 
-    crew:addPassenger(captain)
-    entry:setCrew(crew)
+    local captain = {
+        tier = tier,
+        primaryClass = self.config.primaryClass,
+        secondaryClass = self.config.secondaryClass,
+        positiveTraits = self.config.positiveTraits,
+        neutralTraits = self.config.neutralTraits,
+        negativeTraits = self.config.negativeTraits
+    }
+
+    if tier >=3 then
+        local numPrimaryClassStations = self.area.analysis.totalNumRelevantStations[captain.primaryClass]
+        local numSecondaryClassStations = self.area.analysis.totalNumRelevantStations[captain.secondaryClass]
+        local totalStations = numPrimaryClassStations + numSecondaryClassStations
+        if random():test(numSecondaryClassStations / totalStations) then
+            captain.primaryClass, captain.secondaryClass = captain.secondaryClass, captain.primaryClass
+        end
+    end
+    local sector = selectByWeight(self.area.analysis.numRelevantStations[captain.primaryClass])
+
+    local x, y = fromCoordToXY(sector)
+
+    -- replace ClassType.None with nil
+    if self.config.primaryClass == CaptainUtility.ClassType.None then
+        self.config.primaryClass = nil
+    end
+
+    if self.config.secondaryClass == CaptainUtility.ClassType.None then
+        self.config.secondaryClass = nil
+    end
+
+    faction:addScript("missions/promisingcaptainmission.lua", faction.index, self.shipName, x, y, captain)
+
+    if tier >= 3 then
+        faction:sendChatMessage(shipCaptain.displayName, ChatMessageType.Whisp,
+            "I heard of a promising tier %1% captain in \\s(%2%:%3%). They went missing and someone is looking for them. Check the bulletin boards in that sector." %
+            _T, captain.tier, x, y)
+    else
+        faction:sendChatMessage(shipCaptain.displayName, ChatMessageType.Whisp,
+            "I found a promising tier %1% captain for hire in \\s(%2%:%3%)."%_T, captain.tier, x, y)
+    end
+    faction:sendChatMessage(self.shipName, ChatMessageType.Information,
+        "%1% has finished scouting captains and is awaiting your next orders in \\s(%2%:%3%)."%_T, self.shipName, sx,
+        sy)
 end
 
 -- after this function was called, self.data will be read to be saved to database
@@ -302,16 +304,16 @@ end
 function ScoutCaptainCommand:getDescriptionText()
     -- local totalRuntimeInMinutes = self.data.prediction.duration * 60
     local totalRuntime = self.data.prediction.duration
-    local timeRemaining = round((totalRuntime - self.data.runTime) / 60) * 60
+    local timeRemaining = totalRuntime - self.data.runTime
     local completed = round(self.data.runTime / totalRuntime * 100)
 
-    return "The ship is looking for talented captains.\n\nTime remaining: ${timeRemaining} (${completed} % done).",
+    return "The ship is looking for talented captains.\n\nTime remaining: ${timeRemaining} (${completed} % done)."%_T,
         { timeRemaining = createReadableShortTimeString(timeRemaining), completed = completed }
 end
 
 -- returns the message that should be shown as the current ship action in the fleet overview
 function ScoutCaptainCommand:getStatusMessage()
-    return "Captain Scouting"
+    return "Captain Scouting"%_T
 end
 
 -- returns the path to the icon that will be used in UI and on the galaxy map
@@ -335,24 +337,24 @@ function ScoutCaptainCommand:HasTraitsImpossibleForClass(traitSet, classType, ca
     if positive then
         for _, impossibleTrait in pairs(positive) do
             if traitSet[impossibleTrait] then
-                return "I won't find a ${classType} that is ${perkType}!" % _t %
-                { classType = classTypeDisplayName, perkType = traitProperties[impossibleTrait].displayName }
+                return "I won't find a ${classType} that is ${perkType}!"%_t %
+                    { classType = classTypeDisplayName, perkType = traitProperties[impossibleTrait].displayName }
             end
         end
     end
     if negative then
         for _, impossibleTrait in pairs(negative) do
             if traitSet[impossibleTrait] then
-                return "I won't find a ${classType} that is ${perkType}!" % _t %
-                { classType = classTypeDisplayName, perkType = traitProperties[impossibleTrait].displayName }
+                return "I won't find a ${classType} that is ${perkType}!"%_t %
+                    { classType = classTypeDisplayName, perkType = traitProperties[impossibleTrait].displayName }
             end
         end
     end
     if neutral then
         for _, impossibleTrait in pairs(neutral) do
             if traitSet[impossibleTrait] then
-                return "I won't find a ${classType} that is ${perkType}!" % _t %
-                { classType = classTypeDisplayName, perkType = traitProperties[impossibleTrait].displayName }
+                return "I won't find a ${classType} that is ${perkType}!"%_t %
+                    { classType = classTypeDisplayName, perkType = traitProperties[impossibleTrait].displayName }
             end
         end
     end
@@ -365,18 +367,18 @@ end
 -- where values are clamped or default-set
 function ScoutCaptainCommand:getErrors(ownerIndex, shipName, area, config)
     if area.analysis.reachable == 0 then
-        return "There are no sectors that I can reach!" % _t
+        return "There are no sectors that I can reach!"%_t
     end
 
     -- check configured classes
     -- a captain can't have a secondary class without a primary class
     if (not config.primaryClass or config.primaryClass == 0) and (config.secondaryClass and config.secondaryClass ~= 0) then
-        return "I won't find a captain without a primary class that has chosen to specialize in a second class!" % _t
+        return "I won't find a captain without a primary class that has chosen to specialize in a second class!"%_t
     end
     -- the two classes of a captain must not be the same if they are not nil
     if (config.primaryClass and config.primaryClass ~= 0) and (config.secondaryClass and config.secondaryClass ~= 0) then
         if config.primaryClass == config.secondaryClass then
-            return "I won't find a captain whose second specialization is the same as his primary class!"
+            return "I won't find a captain whose second specialization is the same as his primary class!"%_t
         end
     end
 
@@ -385,8 +387,8 @@ function ScoutCaptainCommand:getErrors(ownerIndex, shipName, area, config)
     for _, trait in pairs(config.positiveTraits) do
         -- check uniqueness
         if traitSet[trait] then
-            return "I won't find a captain that is ${perkType} multiple times!" % _t %
-            { perkType = traitProperties[trait].displayName }
+            return "I won't find a captain that is ${perkType} multiple times!"%_t %
+                { perkType = traitProperties[trait].displayName }
         else
             traitSet[trait] = true
         end
@@ -394,8 +396,8 @@ function ScoutCaptainCommand:getErrors(ownerIndex, shipName, area, config)
     for _, trait in pairs(config.neutralTraits) do
         -- check uniqueness
         if traitSet[trait] then
-            return "I won't find a captain that is ${perkType} multiple times!" % _t %
-            { perkType = traitProperties[trait].displayName }
+            return "I won't find a captain that is ${perkType} multiple times!"%_t %
+                { perkType = traitProperties[trait].displayName }
         else
             traitSet[trait] = true
         end
@@ -403,8 +405,8 @@ function ScoutCaptainCommand:getErrors(ownerIndex, shipName, area, config)
     for _, trait in pairs(config.negativeTraits) do
         -- check uniqueness
         if traitSet[trait] then
-            return "I won't find a captain that is ${perkType} multiple times!" % _t %
-            { perkType = traitProperties[trait].displayName }
+            return "I won't find a captain that is ${perkType} multiple times!"%_t %
+                { perkType = traitProperties[trait].displayName }
         else
             traitSet[trait] = true
         end
@@ -427,8 +429,11 @@ function ScoutCaptainCommand:getErrors(ownerIndex, shipName, area, config)
         local opposingTraitsOfTrait = opposingTraits[trait] or {}
         for _, opposingTrait in pairs(opposingTraitsOfTrait) do
             if traitSet[opposingTrait] then
-                return "I won't find a captain that is ${trait} and ${opposingTrait}!" % _t %
-                { trait = traitProperties[trait].displayName, opposingTrait = traitProperties[opposingTrait].displayName }
+                return "I won't find a captain that is ${trait} and ${opposingTrait}!"%_t %
+                    {
+                        trait = traitProperties[trait].displayName,
+                        opposingTrait = traitProperties[opposingTrait].displayName
+                    }
             end
         end
     end
@@ -438,7 +443,17 @@ function ScoutCaptainCommand:getErrors(ownerIndex, shipName, area, config)
     -- defined, then make sure to re-check that in here as well!
     local areaSelectionIsValid = self:isValidAreaSelection(ownerIndex, shipName, area, config)
     if not areaSelectionIsValid then
-        return areaSelectionIsValid
+        return "The designated area is invalid."%_t
+    end
+
+    local prediction = self:calculatePrediction(ownerIndex, shipName, area, config)
+
+    if prediction.numRelevantStations <= 0 then
+        return "There are no relevant stations in the designated area."%_t
+    end
+
+    if prediction.noCaptainChance >= 0.99 then
+        return "There is no chance to find a captain with this description in the designated area."%_t
     end
 
     -- if there are no errors, just return
@@ -488,9 +503,9 @@ end
 -- scout captain command reuses the default area tooltip in MapCommands.onMapRenderAfterLayers()
 function ScoutCaptainCommand:getAreaSelectionTooltip(ownerIndex, shipName, area, valid)
     if valid then
-        return "Left-Click to select the target Area" % _t
+        return "Left-Click to select the target Area"%_t
     else
-        return "No known stations in this area!" % _t
+        return "No known stations in this area!"%_t
     end
 end
 
@@ -502,11 +517,11 @@ function ScoutCaptainCommand:getConfigurableValues(ownerIndex, shipName)
     local values = {}
 
     -- value names here must match with values returned in ui:buildConfig() below
-    values.primaryClass = { displayName = "Primary Class" % _t, defaultSelectedIndex = 0 }
-    values.secondaryClass = { displayName = "Secondary Class" % _t, defaultSelectedIndex = 0 }
-    values.negativeTraits = { displayName = "Negative Traits" % _t, defaultSelectedIndex = 0 }
-    values.neutralTraits = { displayName = "Neutral Traits" % _t, defaultSelectedIndex = 0 }
-    values.positiveTraits = { displayName = "Positive Traits" % _t, defaultSelectedIndex = 0 }
+    values.primaryClass = { displayName = "Primary Class"%_t, defaultSelectedIndex = 0 }
+    values.secondaryClass = { displayName = "Secondary Class"%_t, defaultSelectedIndex = 0 }
+    values.negativeTraits = { displayName = "Negative Traits"%_t, defaultSelectedIndex = 0 }
+    values.neutralTraits = { displayName = "Neutral Traits"%_t, defaultSelectedIndex = 0 }
+    values.positiveTraits = { displayName = "Positive Traits"%_t, defaultSelectedIndex = 0 }
     -- number of cycles assuming a respawn rate of captains at stations?
 
     return values
@@ -520,11 +535,11 @@ function ScoutCaptainCommand:getPredictableValues()
     local values = {}
 
     values.attackChance = { displayName = SimulationUtility.AttackChanceLabelCaption, value = 0.0 }
-    values.duration = { displayName = "Duration" % _t, value = 0 }
-    values.relevantStations = { displayName = "Relevant Stations" % _t, value = 1 }
+    values.duration = { displayName = "Duration"%_t, value = 0 }
+    values.relevantStations = { displayName = "Relevant Stations"%_t, value = 1 }
 
-    local tierDisplayNameFormat = "Tier ${tier}" % _t
-    values.noCaptain = { displayName = "No Captain" % _t, value = 0.65 }
+    local tierDisplayNameFormat = "Tier ${tier}"%_t
+    values.noCaptain = { displayName = "No Captain"%_t, value = 0.65 }
     values.tier0 = { displayName = tierDisplayNameFormat, value = 0.04375 }
     values.tier1 = { displayName = tierDisplayNameFormat, value = 0.175 }
     values.tier2 = { displayName = tierDisplayNameFormat, value = 0.0875 }
@@ -538,6 +553,9 @@ end
 -- note: this may be called on a temporary instance of the command. all values written to "self" may not persist
 function ScoutCaptainCommand:calculatePrediction(ownerIndex, shipName, area, config)
     local results = {}
+
+    local shipEntry = ShipDatabaseEntry(ownerIndex, shipName)
+    local captain = shipEntry:getCaptain()
     --
     -- calculate number of relevant stations
     --
@@ -547,7 +565,7 @@ function ScoutCaptainCommand:calculatePrediction(ownerIndex, shipName, area, con
         totalNumRelevantStations = area.analysis.totalNumRelevantStations[config.primaryClass] or 0
         if config.secondaryClass and config.secondaryClass ~= CaptainUtility.ClassType.None then
             local numRelevantStations = area.analysis.totalNumRelevantStations[config.secondaryClass] or 0
-            totalNumRelevantStations = results.relevantStations + numRelevantStations
+            totalNumRelevantStations = totalNumRelevantStations + numRelevantStations
         end
     else
         totalNumRelevantStations = area.analysis.totalNumRelevantStations[CaptainUtility.ClassType.None] or 0
@@ -565,27 +583,52 @@ function ScoutCaptainCommand:calculatePrediction(ownerIndex, shipName, area, con
     -- possibly in the future calculate a jump route to include hyperspace jump range
     -- 1. calculate the interSectorTravelDuration by comparing hyperspace jump cooldown with hyperspace recharge
     local timeToTravelToNextSector = 0
-    local shipEntry = ShipDatabaseEntry(ownerIndex, shipName)
     local jumpRange, canPassRifts, hyperspaceCooldown = shipEntry:getHyperspaceProperties()
     -- if hyperspace jump energy becomes available, compare cooldown with recharge time
     -- interSectorTravelDuration = max(hyperspaceCooldown, hyperspaceRequiredEnergy/shipEnergySurplus)
     timeToTravelToNextSector = hyperspaceCooldown
     local totalTravelTime = 0
     -- 2. calculate the innerSectorTravelDuration
-    for coord, numStations in pairs(area.analysis.numRelevantStations[config.primaryClass]) do
+    for _, numStations in pairs(area.analysis.numRelevantStations[config.primaryClass]) do
         -- can't get maxVelocity, etc. from ShipDatabaseEntry, so I assume 2 minutes per station
         -- local innerSectorTravelDuration = averageDistance / maxVelocity * numStations
         local timeToTravelBetweenAllStations = 2 * 60 * numStations
         totalTravelTime = totalTravelTime + math.max(timeToTravelToNextSector, timeToTravelBetweenAllStations)
     end
     -- 3. apply reckless, careful, navigator, disoriented
+    local totalTravelTimePerkImpactMultiplier = 1
+    -- Navigator impact
+    if captain:hasPerk(CaptainUtility.PerkType.Navigator) then
+        totalTravelTimePerkImpactMultiplier = totalTravelTimePerkImpactMultiplier +
+            CaptainUtility.getScoutCaptainTimePerkImpact(captain, CaptainUtility.PerkType.Navigator)
+    end
+    -- Reckless impact
+    if captain:hasPerk(CaptainUtility.PerkType.Reckless) then
+        totalTravelTimePerkImpactMultiplier = totalTravelTimePerkImpactMultiplier +
+            CaptainUtility.getScoutCaptainTimePerkImpact(captain, CaptainUtility.PerkType.Reckless)
+    end
+    -- Disoriented impact
+    if captain:hasPerk(CaptainUtility.PerkType.Disoriented) then
+        totalTravelTimePerkImpactMultiplier = totalTravelTimePerkImpactMultiplier +
+            CaptainUtility.getScoutCaptainTimePerkImpact(captain, CaptainUtility.PerkType.Disoriented)
+    end
+    -- Addict impact
+    if captain:hasPerk(CaptainUtility.PerkType.Addict) then
+        totalTravelTimePerkImpactMultiplier = totalTravelTimePerkImpactMultiplier +
+            CaptainUtility.getScoutCaptainTimePerkImpact(captain, CaptainUtility.PerkType.Addict)
+    end
+    -- Careful impact
+    if captain:hasPerk(CaptainUtility.PerkType.Careful) then
+        totalTravelTimePerkImpactMultiplier = totalTravelTimePerkImpactMultiplier +
+            CaptainUtility.getScoutCaptainTimePerkImpact(captain, CaptainUtility.PerkType.Careful)
+    end
+
     -- 4. minimum trip time is 20 minutes
-    duration = math.max(totalTravelTime, 20 * 60)
+    duration = math.max(totalTravelTimePerkImpactMultiplier * totalTravelTime, 20 * 60)
 
     -- 5. simulate the time it takes to find the right one out of the available ones
     local timeToSortThroughCaptains = 3600 * #config.positiveTraits + 1800 * #config.neutralTraits +
-    900 * #config.negativeTraits
-    -- 6. apply connected and matching class, i.e. a miner is better at finding miners
+        900 * #config.negativeTraits
 
     duration = duration + timeToSortThroughCaptains
 
@@ -601,11 +644,22 @@ function ScoutCaptainCommand:calculatePrediction(ownerIndex, shipName, area, con
     results.tier2Chance = 0
     results.tier3Chance = 0
     if totalNumRelevantStations > 0 then
+        if captain:hasPerk(CaptainUtility.PerkType.Connected) then
+            totalNumRelevantStations = totalNumRelevantStations +
+                totalNumRelevantStations *
+                CaptainUtility.getScoutCaptainTierProbabilityPerkImpact(captain, CaptainUtility.PerkType.Connected)
+        end
+        if captain:hasClass(config.primaryClass) then
+            totalNumRelevantStations = totalNumRelevantStations * 1.15
+        end
+        if captain:hasClass(config.secondaryClassClass) then
+            totalNumRelevantStations = totalNumRelevantStations * 1.15
+        end
         local noCaptainChance = baseNoCaptainChance ^ totalNumRelevantStations
         local tier0OrLowerChance = (baseTier0Chance + baseNoCaptainChance) ^ totalNumRelevantStations
         local tier1OrLowerChance = (baseTier1Chance + baseTier0Chance + baseNoCaptainChance) ^ totalNumRelevantStations
         local tier2OrLowerChance = (baseTier2Chance + baseTier1Chance + baseTier0Chance + baseNoCaptainChance) ^
-        totalNumRelevantStations
+            totalNumRelevantStations
 
         results.noCaptainChance = noCaptainChance
         results.tier0Chance = tier0OrLowerChance - noCaptainChance
@@ -613,6 +667,9 @@ function ScoutCaptainCommand:calculatePrediction(ownerIndex, shipName, area, con
         results.tier2Chance = tier2OrLowerChance - tier1OrLowerChance
         results.tier3Chance = 1 - tier2OrLowerChance
 
+        --
+        -- the following comment is intended for the case that disabling tiers is implemented
+        --
         -- normalize probabilities and use normalization factor on duration
         -- local normalizationFactor = results.noCaptainChance + results.tier0Chance + results.tier1Chance + results.tier2Chance + results.tier3Chance
         -- normalizationFactor = 1 / normalizationFactor
@@ -635,43 +692,37 @@ function ScoutCaptainCommand:generateAssessmentFromPrediction(prediction, captai
     -- use it as a guidance, but don't just use the same sentences etc.
 
     local total = area.analysis.sectors - area.analysis.unreachable
-    if total == 0 then return "In diesem Gebiet können wir nicht prototypisieren!" end
+    if total == 0 then return "There are no reachable sectors in this area!"%_t end
 
-    local pirates = area.analysis.sectorsByFaction[0] or 0
+    local noCaptainChance = prediction.noCaptainChance or 0
     local attackChance = prediction.attackChance
     local pirateSectorRatio = SimulationUtility.calculatePirateAttackSectorRatio(area)
 
-    local resourceLines = {}
-    if pirates / total >= 0.75 then
-        table.insert(resourceLines, "Das Gebiet ist sehr ergiebig für ScoutCaptainn.")
-    elseif pirates / total >= 0.45 then
-        table.insert(resourceLines, "Das Gebiet ist ergiebig. Prototyp.")
-    elseif pirates / total >= 0.05 then
-        table.insert(resourceLines, "Das Gebiet ist mäßig ergiebig. Prototyp. Prototyp. Prototyp.")
+    local noCaptainProbabilityLines = {}
+    if noCaptainChance >= 0.75 then
+        table.insert(noCaptainProbabilityLines, "It's unlikely to find such a captain here."%_t)
+    elseif noCaptainChance >= 0.45 then
+        table.insert(noCaptainProbabilityLines, "It's hit-or-miss to find such a captain here."%_t)
+    elseif noCaptainChance >= 0.05 then
+        table.insert(noCaptainProbabilityLines, "It's likely to find such a captain here."%_t)
+    elseif noCaptainChance > 0.0 then
+        table.insert(noCaptainProbabilityLines, "It's almost certain to find such a captain here."%_t)
     else
-        table.insert(resourceLines, "Das Gebiet ist wenig ergiebig, dafür sicherer.  Prototyp. Prototyp. Prototyp.")
+        table.insert(noCaptainProbabilityLines, "It's certain to find such a captain here."%_t)
     end
 
     local pirateLines = SimulationUtility.getPirateAssessmentLines(pirateSectorRatio)
     local attackLines = SimulationUtility.getAttackAssessmentLines(attackChance)
     local underRadar, returnLines = SimulationUtility.getDisappearanceAssessmentLines(attackChance)
 
-    local deliveries = {}
-
-    if config.duration and config.duration >= 1 then
-        table.insert(deliveries, "Sie können etwa alle 30 Minuten eine Zwischenlieferung erwarten.")
-        table.insert(deliveries, "Wir werden alle 30 Minuten eine Zwischenlieferung schicken.")
-    end
-
     local rnd = Random(Seed(captain.name))
 
     return {
-        randomEntry(rnd, resourceLines),
+        randomEntry(rnd, noCaptainProbabilityLines),
         randomEntry(rnd, pirateLines),
         randomEntry(rnd, attackLines),
         randomEntry(rnd, underRadar),
         randomEntry(rnd, returnLines),
-        randomEntry(rnd, deliveries),
     }
 end
 
@@ -778,7 +829,7 @@ function ScoutCaptainCommand:buildPredictionUI(window, rect, predictableValues, 
     window:createLabel(vlistDisplayNames:nextRect(15), predictableValues.duration.displayName .. ":", 12)
     window:createLabel(vlistDisplayNames:nextRect(15), predictableValues.relevantStations.displayName .. ":", 12)
     vlistDisplayNames:nextRect(15)
-    window:createLabel(vlistDisplayNames:nextRect(20), "Captain" % _t .. ":", 12)
+    window:createLabel(vlistDisplayNames:nextRect(20), "Captain"%_t .. ":", 12)
     window:createLabel(vlistDisplayNames:nextRect(15), predictableValues.noCaptain.displayName .. ":", 12)
     window:createLabel(vlistDisplayNames:nextRect(15), predictableValues.tier0.displayName % { tier = 0 } .. ":", 12)
     window:createLabel(vlistDisplayNames:nextRect(15), predictableValues.tier1.displayName % { tier = 1 } .. ":", 12)
@@ -800,17 +851,26 @@ function ScoutCaptainCommand:buildPredictionUI(window, rect, predictableValues, 
     return ui
 end
 
+local function indexOf(array, value)
+    for i, v in ipairs(array) do
+        if v == value then
+            return i
+        end
+    end
+    return nil
+end
+
 -- this will be called on a temporary instance of the command. all values written to "self" will not persist
 function ScoutCaptainCommand:buildUI(startPressedCallback, changeAreaPressedCallback, recallPressedCallback,
                                      configChangedCallback)
     local ui = {}
-    ui.orderName = "Scout Captain" % _t
+    ui.orderName = "Scout Captain"%_t
     ui.icon = ScoutCaptainCommand:getIcon()
 
     local size = vec2(700, 820)
 
     ui.window = GalaxyMap():createWindow(Rect(size))
-    ui.window.caption = "Scout Captain /* as in: to scout a talent, talent scouting, headhunting*/" % _t
+    ui.window.caption = "Scout Captain /* as in: to scout a talent, talent scouting, headhunting*/"%_t
 
     local settings = { configHeight = 225, changeAreaButton = true }
     ui.commonUI = SimulationUtility.buildCommandUI(ui.window, startPressedCallback, changeAreaPressedCallback,
@@ -824,7 +884,7 @@ function ScoutCaptainCommand:buildUI(startPressedCallback, changeAreaPressedCall
     local predictableValues = self:getPredictableValues()
     ui.predictionUI = self:buildPredictionUI(ui.window, ui.commonUI.predictionRect, predictableValues, ui.commonUI)
 
-    ui.clear = function(self, ownerIndex, shipName)
+    ui.clear = function (self, ownerIndex, shipName)
         self.commonUI:clear()
 
         self.commonUI.attackChanceLabel.caption = ""
@@ -839,7 +899,7 @@ function ScoutCaptainCommand:buildUI(startPressedCallback, changeAreaPressedCall
 
     -- used to fill values into the UI
     -- config == nil means fill with default values
-    ui.refresh = function(self, ownerIndex, shipName, area, config)
+    ui.refresh = function (self, ownerIndex, shipName, area, config)
         self.commonUI:refresh(ownerIndex, shipName, area, config)
 
         if not config then
@@ -849,7 +909,7 @@ function ScoutCaptainCommand:buildUI(startPressedCallback, changeAreaPressedCall
             -- use "setValueNoCallback" since we don't want to trigger "refreshPredictions()" while filling in default values
             self.configUI.primaryClassComboBox:setSelectedIndexNoCallback(configValues.primaryClass.defaultSelectedIndex)
             self.configUI.secondaryClassComboBox:setSelectedIndexNoCallback(configValues.secondaryClass
-            .defaultSelectedIndex)
+                .defaultSelectedIndex)
             for _, traitComboBox in pairs(self.configUI.negativeTraitsComboBoxes) do
                 traitComboBox:setSelectedIndexNoCallback(configValues.negativeTraits.defaultSelectedIndex)
             end
@@ -866,13 +926,13 @@ function ScoutCaptainCommand:buildUI(startPressedCallback, changeAreaPressedCall
     end
 
     -- gut feeling says that each config option change should always be reflected in the predictions if it impacts the behavior
-    ui.refreshPredictions = function(self, ownerIndex, shipName, area, config)
+    ui.refreshPredictions = function (self, ownerIndex, shipName, area, config)
         local prediction = ScoutCaptainCommand:calculatePrediction(ownerIndex, shipName, area, config)
         self:displayPrediction(prediction, config, ownerIndex)
         self.commonUI:refreshPredictions(ownerIndex, shipName, area, config, ScoutCaptainCommand, prediction)
     end
 
-    ui.displayPrediction = function(self, prediction, config, ownerIndex)
+    ui.displayPrediction = function (self, prediction, config, ownerIndex)
         self.commonUI:setAttackChance(prediction.attackChance)
         local date = os.date("!*t", prediction.duration)
         self.predictionUI.durationLabel.caption = string.format("%s h %s min", date.hour, date.min)
@@ -880,18 +940,18 @@ function ScoutCaptainCommand:buildUI(startPressedCallback, changeAreaPressedCall
         self.predictionUI.noCaptainLabel.caption = string.format("%.3f", prediction.noCaptainChance * 100):gsub("%.?0+$",
             "") .. "%"
         self.predictionUI.tier0Label.caption = string.format("%.3f", prediction.tier0Chance * 100):gsub("%.?0+$", "") ..
-        "%"
+            "%"
         self.predictionUI.tier1Label.caption = string.format("%.3f", prediction.tier1Chance * 100):gsub("%.?0+$", "") ..
-        "%"
+            "%"
         self.predictionUI.tier2Label.caption = string.format("%.3f", prediction.tier2Chance * 100):gsub("%.?0+$", "") ..
-        "%"
+            "%"
         self.predictionUI.tier3Label.caption = string.format("%.3f", prediction.tier3Chance * 100):gsub("%.?0+$", "") ..
-        "%"
+            "%"
     end
 
     -- used to build a config table for the command, based on values configured in the UI
     -- gut feeling says that each config option change should always be reflected in the predictions if it impacts the behavior
-    ui.buildConfig = function(self)
+    ui.buildConfig = function (self)
         local config = {}
 
         config.primaryClass = nil
@@ -928,23 +988,40 @@ function ScoutCaptainCommand:buildUI(startPressedCallback, changeAreaPressedCall
     end
 
     -- optional; called whenever the command window was closed while the map is still visible
-    ui.onWindowClosed = function(self) end
+    ui.onWindowClosed = function (self) end
 
-    ui.setActive = function(self, active, description)
+    ui.setActive = function (self, active, description)
         self.commonUI:setActive(active, description)
 
-        --self.durationSlider.active = active
-        --self.efficiencySlider.active = active
-        --self.yieldTickSlider.active = active
+        self.configUI.primaryClassComboBox.active = active
+        self.configUI.secondaryClassComboBox.active = active
+        for _, comboBox in pairs(self.configUI.positiveTraitsComboBoxes) do comboBox.active = active end
+        for _, comboBox in pairs(self.configUI.neutralTraitsComboBoxes) do comboBox.active = active end
+        for _, comboBox in pairs(self.configUI.negativeTraitsComboBoxes) do comboBox.active = active end
     end
 
-    ui.displayConfig = function(self, config, ownerIndex)
-        --self.durationSlider:setValueNoCallback(config.duration)
-        --self.efficiencySlider:setValueNoCallback(config.efficiency * 100)
-        --self.yieldTickSlider:setValueNoCallback(config.yieldTick)
+    ui.displayConfig = function (self, config, ownerIndex)
+        ui.configUI.primaryClassComboBox:setSelectedIndexNoCallback(config.primaryClass)
+        ui.configUI.secondaryClassComboBox:setSelectedIndexNoCallback(config.secondaryClass)
+
+        -- TODO: display traits
+        for i, trait in pairs(config.positiveTraits) do
+            traitIndex = indexOf(positiveTraits, trait)
+            ui.configUI.positiveTraitsComboBoxes[i]:setSelectedIndexNoCallback(traitIndex)
+        end
+
+        for i, trait in pairs(config.neutralTraits) do
+            traitIndex = indexOf(neutralTraits, trait)
+            ui.configUI.neutralTraitsComboBoxes[i]:setSelectedIndexNoCallback(traitIndex)
+        end
+
+        for i, trait in pairs(config.negativeTraits) do
+            traitIndex = indexOf(negativeTraits, trait)
+            ui.configUI.negativeTraitsComboBoxes[i]:setSelectedIndexNoCallback(traitIndex)
+        end
     end
 
     return ui
 end
 
-return setmetatable({ new = new }, { __call = function(_, ...) return new(...) end })
+return setmetatable({ new = new }, { __call = function (_, ...) return new(...) end })

@@ -1,16 +1,17 @@
 local function removeTrait(trait, traits, positive, negative, neutral)
-    removeItemsFromTable(traits, {trait})
+    removeItemsFromTable(traits, { trait })
 
     local opposites = opposingPerks[trait] or {}
 
     for _, opposite in pairs(opposites) do
-        removeItemsFromTable(positive, {opposite, trait})
-        removeItemsFromTable(negative, {opposite, trait})
-        removeItemsFromTable(neutral, {opposite, trait})
+        removeItemsFromTable(positive, { opposite, trait })
+        removeItemsFromTable(negative, { opposite, trait })
+        removeItemsFromTable(neutral, { opposite, trait })
     end
 end
 
-function CaptainGenerator:generateWithTraits(tier_in, level_in, primaryClass_in, secondaryClass_in, positiveTraits, negativeTraits, neutralTraits)
+function CaptainGenerator:generateWithTraits(tier_in, level_in, primaryClass_in, secondaryClass_in, positiveTraits,
+                                             negativeTraits, neutralTraits)
     if not positiveTraits and not negativeTraits and not neutralTraits then
         return generate(self, tier_in, level_in, primaryClass_in, secondaryClass_in)
     end
@@ -45,8 +46,8 @@ function CaptainGenerator:generateWithTraits(tier_in, level_in, primaryClass_in,
 
     if (captain.tier > 0 and captain.primaryClass == 0)
         or (captain.tier == 3 and captain.secondaryClass == 0) then
-
-        captain.primaryClass, captain.secondaryClass = self:determineCaptainClasses(self.random, captain.tier, primaryClass_in)
+        captain.primaryClass, captain.secondaryClass = self:determineCaptainClasses(self.random, captain.tier,
+            primaryClass_in)
     end
 
     -- determine possible perks
@@ -65,7 +66,8 @@ function CaptainGenerator:generateWithTraits(tier_in, level_in, primaryClass_in,
 
     -- and for secondary class
     if captain.secondaryClass ~= 0 then
-        local positiveToRemove, negativeToRemove, neutralToRemove = self:getImpossiblePerksOfClass(captain.secondaryClass)
+        local positiveToRemove, negativeToRemove, neutralToRemove = self:getImpossiblePerksOfClass(captain
+            .secondaryClass)
         removeItemsFromTable(positive, positiveToRemove)
         removeItemsFromTable(negative, negativeToRemove)
         removeItemsFromTable(neutral, neutralToRemove)
@@ -84,8 +86,8 @@ function CaptainGenerator:generateWithTraits(tier_in, level_in, primaryClass_in,
             table.insert(perks, entry)
 
             removeTrait(entry, positive, positive, negative, neutral)
-            
-            numPositivePerks = numPositivePerks-1
+
+            numPositivePerks = numPositivePerks - 1
         else
             break
         end
@@ -94,10 +96,10 @@ function CaptainGenerator:generateWithTraits(tier_in, level_in, primaryClass_in,
     for _, entry in pairs(negativeTraits) do
         if numNegativePerks > 0 then
             table.insert(perks, entry)
-            
+
             removeTrait(entry, negative, positive, negative, neutral)
-            
-            numNegativePerks = numNegativePerks-1
+
+            numNegativePerks = numNegativePerks - 1
         else
             break
         end
@@ -109,7 +111,7 @@ function CaptainGenerator:generateWithTraits(tier_in, level_in, primaryClass_in,
 
             removeTrait(entry, neutral, positive, negative, neutral)
 
-            numNeutralPerks = numNeutralPerks-1
+            numNeutralPerks = numNeutralPerks - 1
         else
             break
         end
@@ -140,8 +142,6 @@ function CaptainGenerator:generateWithTraits(tier_in, level_in, primaryClass_in,
 
     -- calculate salary from tier, classes and perks
     captain.salary = self:calculateSalary(captain)
-
-    printCaptain(captain)
 
     return captain
 end

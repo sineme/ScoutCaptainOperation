@@ -19,4 +19,6 @@ CommandOrder[CommandType.Maintenance] = 12
 CommandOrder[CommandType.Escort] = 13
 CommandOrder[CommandType.ScoutCaptain] = 14
 
+-- TODO: probably better to swap index and type and allow extension by table.insert
+
 return CommandOrder

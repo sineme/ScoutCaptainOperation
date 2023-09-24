@@ -1,0 +1,151 @@
+# ========== C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua ==========
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "Sorry, boss. I couldn't find a captain matching your description."
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "%1% has finished scouting captains and is awaiting your next orders in \\s(%2%:%3%)."
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "I found a promising tier %1% captain for hire in \\s(%2%:%3%)."
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "The ship is looking for talented captains.\n\nTime remaining: ${timeRemaining} (${completed} % done)."
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "Captain Scouting"
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "I won't find a ${classType} that is ${perkType}!"
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "There are no sectors that I can reach!"
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "I won't find a captain without a primary class that has chosen to specialize in a second class!"
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "I won't find a captain whose second specialization is the same as his primary class!"
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "I won't find a captain that is ${perkType} multiple times!"
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "I won't find a captain that is ${trait} and ${opposingTrait}!"
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "The designated area is invalid."
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "There are no relevant stations in the designated area."
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "There is no chance to find a captain with this description in the designated area."
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "Left-Click to select the target Area"
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "No known stations in this area!"
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "Primary Class"
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "Negative Traits"
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "Neutral Traits"
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "Positive Traits"
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "Relevant Stations"
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "Tier ${tier}"
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "There are no reachable sectors in this area!"
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "It's unlikely to find such a captain here."
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "It's hit-or-miss to find such a captain here."
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "It's likely to find such a captain here."
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "It's almost certain to find such a captain here."
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "It's certain to find such a captain here."
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgid "Scout Captain"
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/background/simulation/scoutcaptaincommand.lua:
+msgctxt "as in: to scout a talent, talent scouting, headhunting"
+msgid "Scout Captain"
+msgstr ""
+
+
+# ========== C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/player/map/mapcommands.lua ==========
+
+# ========== C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/utilities/sineme_sco_localization.lua ==========
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/utilities/sineme_sco_localization.lua:
+msgid "Better at finding captains of the same class."
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/utilities/sineme_sco_localization.lua:
+msgid "Finds ${var}% more candidates."
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/utilities/sineme_sco_localization.lua:
+msgid "A Promising Captain"
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/utilities/sineme_sco_localization.lua:
+msgid "A Promising Captain (Tier ${captain.tier})"
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/utilities/sineme_sco_localization.lua:
+msgid "${shipCaptain}, captain of ${shipName}, has informed you of a promising captain (Tier ${captain.tier}) in sector (${location.x}: ${location.y}). Check the stations in that sector if they are for hire or the bulletin boards if they are in trouble."
+msgstr ""
+
+#: C:/Users/Sineme/AppData/Roaming/Avorion/mods/ScoutCaptainOperation/data/scripts/utilities/sineme_sco_localization.lua:
+msgid "Missing:\nName: ${displayName}\nProfession: ${class}\nAge: ${age}\nLast Known Location: (${x}:${y})\n\nIt's been a while since I've last had word from my good friend ${displayName}. Usually they check in with me regularly. I'm worried that something bad might have happened to them. The only clue I have to go on is their last message that they were on their way to sector (${x}:${y}). Please help me find my friend!\n\nMy friend is very capable, I'm sure they'll offer their loyalty to whomever rescues them!\n\n${client}"
+msgstr ""
+
+
