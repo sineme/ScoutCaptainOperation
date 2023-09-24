@@ -66,7 +66,7 @@ function CaptainUtility.getScoutCaptainTierProbabilityPerkImpact(captain, perk)
     connectedImpacts[5] = 1.2
 
     if perk == CaptainUtility.PerkType.Connected then
-        return -connectedImpacts[captain.level] or 0 -- reduction multiplier
+        return connectedImpacts[captain.level] or 0 -- reduction multiplier
     else
         return 0                                     -- fallback
     end

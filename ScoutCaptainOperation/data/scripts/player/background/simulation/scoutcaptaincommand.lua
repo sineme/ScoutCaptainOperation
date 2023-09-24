@@ -646,8 +646,8 @@ function ScoutCaptainCommand:calculatePrediction(ownerIndex, shipName, area, con
     if totalNumRelevantStations > 0 then
         if captain:hasPerk(CaptainUtility.PerkType.Connected) then
             totalNumRelevantStations = totalNumRelevantStations +
-                totalNumRelevantStations *
-                CaptainUtility.getScoutCaptainTierProbabilityPerkImpact(captain, CaptainUtility.PerkType.Connected)
+            totalNumRelevantStations *
+            CaptainUtility.getScoutCaptainTierProbabilityPerkImpact(captain, CaptainUtility.PerkType.Connected)
         end
         if captain:hasClass(config.primaryClass) then
             totalNumRelevantStations = totalNumRelevantStations * 1.15
@@ -655,6 +655,7 @@ function ScoutCaptainCommand:calculatePrediction(ownerIndex, shipName, area, con
         if captain:hasClass(config.secondaryClassClass) then
             totalNumRelevantStations = totalNumRelevantStations * 1.15
         end
+
         local noCaptainChance = baseNoCaptainChance ^ totalNumRelevantStations
         local tier0OrLowerChance = (baseTier0Chance + baseNoCaptainChance) ^ totalNumRelevantStations
         local tier1OrLowerChance = (baseTier1Chance + baseTier0Chance + baseNoCaptainChance) ^ totalNumRelevantStations
