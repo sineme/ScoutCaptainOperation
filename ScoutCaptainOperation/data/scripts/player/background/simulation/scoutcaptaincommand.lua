@@ -36,18 +36,23 @@ local baseTier3Chance = baseCaptainChance * 1 / 15
 --  8/65
 
 local function fromCoordToXY(coord)
-    local y = bit32.band(coord, 0x0000ffff)
-    local x = bit32.band(coord, 0xffff0000)
-    y = y - 0x7fff
-    x = bit32.rshift(x, 16)
-    x = x - 0x7fff
+    -- leftmost 10 bit for x
+    local x = bit32.band(coord, 0xffc00)
+    -- rightmost 10 bit for y
+    local y = bit32.band(coord, 0x003ff)
+    x = bit32.rshift(x, 10)
+    x = x - 0x1ff
+    y = y - 0x1ff
     return x, y
 end
 
 local function fromXYToCoord(x, y)
-    y = y + 0x7fff
-    x = x + 0x7fff
-    x = bit32.lshift(x, 16)
+    -- shift x (-500, 500] into positive numbers
+    x = x + 0x1ff
+    -- bitshift x, so the leftmost 10 bit are for x
+    x = bit32.lshift(x, 10)
+    -- shift y (-500, 500] into positive numbers
+    y = y + 0x1ff
     return x + y
 end
 
@@ -100,6 +105,8 @@ end
 function ScoutCaptainCommand:initialize()
     local parent = getParentFaction()
     local prediction = self:calculatePrediction(parent.index, self.shipName, self.area, self.config)
+    self.data.totalNumRelevantStations = self.area.analysis.totalNumRelevantStations
+    self.data.numRelevantStations = self.area.analysis.numRelevantStations
     self.data.prediction = prediction
     self.data.duration = prediction.duration
     self.data.noCaptainChance = prediction.noCaptainChance
@@ -125,7 +132,7 @@ end
 -- return a table of sectors here to start a special analysis of those sectors instead of a rect
 -- this will be called on a temporary instance of the command. all values written to "self" will not persist
 -- note: See TravelCommand for an extensive example
-function ScoutCaptainCommand:getAreaAnalysisSectors(results, meta)
+function ScoutCaptainCommand:getAreaAnalysisSectors(analysis, meta)
     local sectorsToAnalyse = {}
 
     local player = Player(meta.callingPlayer)
@@ -146,18 +153,18 @@ end
 
 -- executed when an area analysis involving this type of command starts
 -- this will be called on a temporary instance of the command. all values written to "self" will not persist
-function ScoutCaptainCommand:onAreaAnalysisStart(results, meta)
-    results.totalNumRelevantStations = {}
-    results.numRelevantStations = {}
+function ScoutCaptainCommand:onAreaAnalysisStart(analysis, meta)
+    analysis.totalNumRelevantStations = {}
+    analysis.numRelevantStations = {}
     for _, classType in pairs(CaptainUtility.ClassType) do
-        results.numRelevantStations[classType] = {}
-        results.totalNumRelevantStations[classType] = 0
+        analysis.numRelevantStations[classType] = {}
+        analysis.totalNumRelevantStations[classType] = 0
     end
 end
 
 -- executed when an area analysis involving this type of command is checking a specific sector
 -- this will be called on a temporary instance of the command. all values written to "self" will not persist
-function ScoutCaptainCommand:onAreaAnalysisSector(results, meta, x, y)
+function ScoutCaptainCommand:onAreaAnalysisSector(analysis, meta, x, y)
     local sectorView = Player(meta.callingPlayer):getKnownSector(x, y)
     if not sectorView then
         -- should never happen, as the sector was known in getAreaAnalysisSectors
@@ -166,11 +173,9 @@ function ScoutCaptainCommand:onAreaAnalysisSector(results, meta, x, y)
     end
     -- add relevant stations for no specialization
     local coord = fromXYToCoord(x, y)
-    local relevantStations = results.totalNumRelevantStations[CaptainUtility.ClassType.None]
-    results.totalNumRelevantStations[CaptainUtility.ClassType.None] = relevantStations + sectorView.numStations
-    results.numRelevantStations[CaptainUtility.ClassType.None] = results.numRelevantStations
-        [CaptainUtility.ClassType.None]
-    results.numRelevantStations[CaptainUtility.ClassType.None][coord] = sectorView.numStations
+    local relevantStations = analysis.totalNumRelevantStations[CaptainUtility.ClassType.None]
+    analysis.totalNumRelevantStations[CaptainUtility.ClassType.None] = relevantStations + sectorView.numStations
+    analysis.numRelevantStations[CaptainUtility.ClassType.None][coord] = sectorView.numStations
 
     local stations = { sectorView:getStationTitles() }
     for _, station in pairs(stations) do
@@ -178,18 +183,17 @@ function ScoutCaptainCommand:onAreaAnalysisSector(results, meta, x, y)
         local classType = ScoutCaptainOperationUtility.getClassFromStation({ title = station.text })
         if classType then
             -- used to calculate the tier distribution of the captain
-            results.totalNumRelevantStations[classType] = results.totalNumRelevantStations[classType] + 1
+            analysis.totalNumRelevantStations[classType] = analysis.totalNumRelevantStations[classType] + 1
             -- used to calculate the travel time per sector
             -- used to chose the sector where the captain can be acquired
-            results.numRelevantStations[classType] = results.numRelevantStations[classType]
-            results.numRelevantStations[classType][coord] = (results.numRelevantStations[classType][coord] or 0) + 1
+            analysis.numRelevantStations[classType][coord] = (analysis.numRelevantStations[classType][coord] or 0) + 1
         end
     end
 end
 
 -- executed when an area analysis involving this type of command finished
 -- this will be called on a temporary instance of the command. all values written to "self" will not persist
-function ScoutCaptainCommand:onAreaAnalysisFinished(results, meta)
+function ScoutCaptainCommand:onAreaAnalysisFinished(analysis, meta)
 end
 
 -- executed when the command starts for the first time (not when being restored)
@@ -199,7 +203,7 @@ end
 -- calculate and register the command for an attack if necessary here
 function ScoutCaptainCommand:onStart()
     if self.data.prediction.attackLocation then
-        local time = random():getFloat(0.1, 0.75) * self.config.duration
+        local time = random():getFloat(0.1, 0.75) * self.data.duration
         local location = self.data.prediction.attackLocation
         local x, y = location.x, location.y
 
@@ -251,14 +255,15 @@ function ScoutCaptainCommand:onFinish()
     }
 
     if tier >=3 then
-        local numPrimaryClassStations = self.area.analysis.totalNumRelevantStations[captain.primaryClass]
-        local numSecondaryClassStations = self.area.analysis.totalNumRelevantStations[captain.secondaryClass]
+        local numPrimaryClassStations = self.data.totalNumRelevantStations[captain.primaryClass]
+        local numSecondaryClassStations = self.data.totalNumRelevantStations[captain.secondaryClass]
         local totalStations = numPrimaryClassStations + numSecondaryClassStations
         if random():test(numSecondaryClassStations / totalStations) then
             captain.primaryClass, captain.secondaryClass = captain.secondaryClass, captain.primaryClass
         end
     end
-    local sector = selectByWeight(self.area.analysis.numRelevantStations[captain.primaryClass])
+
+    local sector = selectByWeight(self.data.numRelevantStations[captain.primaryClass])
 
     local x, y = fromCoordToXY(sector)
 
@@ -552,7 +557,7 @@ end
 -- gut feeling says that each config option change should always be reflected in the predictions if it impacts the behavior
 -- note: this may be called on a temporary instance of the command. all values written to "self" may not persist
 function ScoutCaptainCommand:calculatePrediction(ownerIndex, shipName, area, config)
-    local results = {}
+    local prediction = {}
 
     local shipEntry = ShipDatabaseEntry(ownerIndex, shipName)
     local captain = shipEntry:getCaptain()
@@ -570,10 +575,10 @@ function ScoutCaptainCommand:calculatePrediction(ownerIndex, shipName, area, con
     else
         totalNumRelevantStations = area.analysis.totalNumRelevantStations[CaptainUtility.ClassType.None] or 0
     end
-    results.numRelevantStations = totalNumRelevantStations
+    prediction.numRelevantStations = totalNumRelevantStations
     -- used to determine the sector where the captain can be hired
-    results.relevantSectorsPrimaryClass = area.analysis.numRelevantStations[config.primaryClass]
-    results.relevantSectorsSecondaryClass = area.analysis.numRelevantStations[config.secondaryClass]
+    prediction.relevantSectorsPrimaryClass = area.analysis.numRelevantStations[config.primaryClass]
+    prediction.relevantSectorsSecondaryClass = area.analysis.numRelevantStations[config.secondaryClass]
 
     --
     -- calculate duration prediction
@@ -638,11 +643,11 @@ function ScoutCaptainCommand:calculatePrediction(ownerIndex, shipName, area, con
     --
     -- calculate captain prediction
     --
-    results.noCaptainChance = 0
-    results.tier0Chance = 0
-    results.tier1Chance = 0
-    results.tier2Chance = 0
-    results.tier3Chance = 0
+    prediction.noCaptainChance = 0
+    prediction.tier0Chance = 0
+    prediction.tier1Chance = 0
+    prediction.tier2Chance = 0
+    prediction.tier3Chance = 0
     if totalNumRelevantStations > 0 then
         if captain:hasPerk(CaptainUtility.PerkType.Connected) then
             totalNumRelevantStations = totalNumRelevantStations +
@@ -662,11 +667,11 @@ function ScoutCaptainCommand:calculatePrediction(ownerIndex, shipName, area, con
         local tier2OrLowerChance = (baseTier2Chance + baseTier1Chance + baseTier0Chance + baseNoCaptainChance) ^
             totalNumRelevantStations
 
-        results.noCaptainChance = noCaptainChance
-        results.tier0Chance = tier0OrLowerChance - noCaptainChance
-        results.tier1Chance = tier1OrLowerChance - tier0OrLowerChance
-        results.tier2Chance = tier2OrLowerChance - tier1OrLowerChance
-        results.tier3Chance = 1 - tier2OrLowerChance
+        prediction.noCaptainChance = noCaptainChance
+        prediction.tier0Chance = tier0OrLowerChance - noCaptainChance
+        prediction.tier1Chance = tier1OrLowerChance - tier0OrLowerChance
+        prediction.tier2Chance = tier2OrLowerChance - tier1OrLowerChance
+        prediction.tier3Chance = 1 - tier2OrLowerChance
 
         --
         -- the following comment is intended for the case that disabling tiers is implemented
@@ -676,16 +681,17 @@ function ScoutCaptainCommand:calculatePrediction(ownerIndex, shipName, area, con
         -- normalizationFactor = 1 / normalizationFactor
         -- duration = normalizationFactor * duration
     else
-        results.noCaptainChance = 1
+        prediction.noCaptainChance = 1
     end
 
-    results.duration = duration
+    prediction.duration = duration
 
     -- calculate attack chance prediction
-    results.attackChance, results.attackLocation = SimulationUtility.calculateAttackProbability(ownerIndex, shipName,
+    local sectorAttackWeights
+    prediction.attackChance, prediction.attackLocation, sectorAttackWeights = SimulationUtility.calculateAttackProbability(ownerIndex, shipName,
         area, config.escorts, duration / 3600)
 
-    return results
+    return prediction
 end
 
 function ScoutCaptainCommand:generateAssessmentFromPrediction(prediction, captain, ownerIndex, shipName, area, config)
