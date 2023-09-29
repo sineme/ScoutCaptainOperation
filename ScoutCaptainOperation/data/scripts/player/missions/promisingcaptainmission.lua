@@ -21,15 +21,6 @@ function initialize(factionIndex, shipName, x, y, captain)
         sync()
         return
     end
-    printTable({
-        initialize = {
-            factionIndex = factionIndex,
-            shipName = shipName,
-            x = x,
-            y = y,
-            captain = captain
-        }
-    })
 
     -- if it's not being initialized from outside, skip initialization
     -- the script will be restored via restore()
