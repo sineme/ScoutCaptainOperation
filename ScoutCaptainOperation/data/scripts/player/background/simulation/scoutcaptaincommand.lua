@@ -105,8 +105,6 @@ end
 function ScoutCaptainCommand:initialize()
     local parent = getParentFaction()
     local prediction = self:calculatePrediction(parent.index, self.shipName, self.area, self.config)
-    self.data.totalNumRelevantStations = self.area.analysis.totalNumRelevantStations
-    self.data.numRelevantStations = self.area.analysis.numRelevantStations
     self.data.prediction = prediction
     self.data.duration = prediction.duration
     self.data.noCaptainChance = prediction.noCaptainChance
@@ -255,15 +253,15 @@ function ScoutCaptainCommand:onFinish()
     }
 
     if tier >=3 then
-        local numPrimaryClassStations = self.data.totalNumRelevantStations[captain.primaryClass]
-        local numSecondaryClassStations = self.data.totalNumRelevantStations[captain.secondaryClass]
+        local numPrimaryClassStations = self.area.analysis.totalNumRelevantStations[captain.primaryClass]
+        local numSecondaryClassStations = self.area.analysis.totalNumRelevantStations[captain.secondaryClass]
         local totalStations = numPrimaryClassStations + numSecondaryClassStations
         if random():test(numSecondaryClassStations / totalStations) then
             captain.primaryClass, captain.secondaryClass = captain.secondaryClass, captain.primaryClass
         end
     end
 
-    local sector = selectByWeight(self.data.numRelevantStations[captain.primaryClass])
+    local sector = selectByWeight(self.area.analysis.numRelevantStations[captain.primaryClass])
 
     local x, y = fromCoordToXY(sector)
 
@@ -600,46 +598,47 @@ function ScoutCaptainCommand:calculatePrediction(ownerIndex, shipName, area, con
         local timeToTravelBetweenAllStations = 2 * 60 * numStations
         totalTravelTime = totalTravelTime + math.max(timeToTravelToNextSector, timeToTravelBetweenAllStations)
     end
-    -- 3. apply reckless, careful, navigator, disoriented
-    local totalTravelTimePerkImpactMultiplier = 1
+    
+    -- 3. simulate the time it takes to find suitable candidates on the stations
+    local timeToFindCaptainOnStations = 1800 * #config.positiveTraits + 900 * #config.neutralTraits +
+    450 * #config.negativeTraits
+    
+    duration = duration + timeToFindCaptainOnStations
+    
+    -- 4. apply reckless, careful, navigator, disoriented
+    local durationPerkImpactMultiplier = 1
     -- Navigator impact
     if captain:hasPerk(CaptainUtility.PerkType.Navigator) then
-        totalTravelTimePerkImpactMultiplier = totalTravelTimePerkImpactMultiplier +
-            CaptainUtility.getScoutCaptainTimePerkImpact(captain, CaptainUtility.PerkType.Navigator)
+        durationPerkImpactMultiplier = durationPerkImpactMultiplier +
+        CaptainUtility.getScoutCaptainTimePerkImpact(captain, CaptainUtility.PerkType.Navigator)
     end
     -- Reckless impact
     if captain:hasPerk(CaptainUtility.PerkType.Reckless) then
-        totalTravelTimePerkImpactMultiplier = totalTravelTimePerkImpactMultiplier +
-            CaptainUtility.getScoutCaptainTimePerkImpact(captain, CaptainUtility.PerkType.Reckless)
+        durationPerkImpactMultiplier = durationPerkImpactMultiplier +
+        CaptainUtility.getScoutCaptainTimePerkImpact(captain, CaptainUtility.PerkType.Reckless)
     end
     -- Disoriented impact
     if captain:hasPerk(CaptainUtility.PerkType.Disoriented) then
-        totalTravelTimePerkImpactMultiplier = totalTravelTimePerkImpactMultiplier +
+        durationPerkImpactMultiplier = durationPerkImpactMultiplier +
             CaptainUtility.getScoutCaptainTimePerkImpact(captain, CaptainUtility.PerkType.Disoriented)
     end
     -- Addict impact
     if captain:hasPerk(CaptainUtility.PerkType.Addict) then
-        totalTravelTimePerkImpactMultiplier = totalTravelTimePerkImpactMultiplier +
-            CaptainUtility.getScoutCaptainTimePerkImpact(captain, CaptainUtility.PerkType.Addict)
+        durationPerkImpactMultiplier = durationPerkImpactMultiplier +
+        CaptainUtility.getScoutCaptainTimePerkImpact(captain, CaptainUtility.PerkType.Addict)
     end
     -- Careful impact
     if captain:hasPerk(CaptainUtility.PerkType.Careful) then
-        totalTravelTimePerkImpactMultiplier = totalTravelTimePerkImpactMultiplier +
-            CaptainUtility.getScoutCaptainTimePerkImpact(captain, CaptainUtility.PerkType.Careful)
+        durationPerkImpactMultiplier = durationPerkImpactMultiplier +
+        CaptainUtility.getScoutCaptainTimePerkImpact(captain, CaptainUtility.PerkType.Careful)
     end
-
-    -- 4. minimum trip time is 20 minutes
-    duration = math.max(totalTravelTimePerkImpactMultiplier * totalTravelTime, 20 * 60)
-
-    -- 5. simulate the time it takes to find the right one out of the available ones
-    local timeToSortThroughCaptains = 3600 * #config.positiveTraits + 1800 * #config.neutralTraits +
-        900 * #config.negativeTraits
-
-    duration = duration + timeToSortThroughCaptains
-
+    
+    -- 5. minimum trip time is 20 minutes
+    duration = math.max(durationPerkImpactMultiplier * duration, 20 * 60)
+    
     -- if the captain should cycle the stations to increase the odds of finding a good captain
     -- duration = duration * cycles
-
+    
     --
     -- calculate captain prediction
     --
@@ -688,8 +687,13 @@ function ScoutCaptainCommand:calculatePrediction(ownerIndex, shipName, area, con
 
     -- calculate attack chance prediction
     local sectorAttackWeights
+
     prediction.attackChance, prediction.attackLocation, sectorAttackWeights = SimulationUtility.calculateAttackProbability(ownerIndex, shipName,
         area, config.escorts, duration / 3600)
+
+    if next(sectorAttackWeights) == nil then
+        prediction.attackChance = 0
+    end
 
     return prediction
 end
