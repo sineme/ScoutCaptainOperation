@@ -81,7 +81,7 @@ function CaptainGenerator:generateWithTraits(tier_in, level_in, primaryClass_in,
     local numPositivePerks, numNegativePerks, numNeutralPerks = self:getNumPerksFromTier(self.random, captain.tier)
 
     -- select requested perks
-    for _, entry in pairs(positiveTraits) do
+    for _, entry in ipairs(positiveTraits) do
         if numPositivePerks > 0 then
             table.insert(perks, entry)
 
@@ -93,7 +93,7 @@ function CaptainGenerator:generateWithTraits(tier_in, level_in, primaryClass_in,
         end
     end
 
-    for _, entry in pairs(negativeTraits) do
+    for _, entry in ipairs(negativeTraits) do
         if numNegativePerks > 0 then
             table.insert(perks, entry)
 
@@ -105,7 +105,7 @@ function CaptainGenerator:generateWithTraits(tier_in, level_in, primaryClass_in,
         end
     end
 
-    for _, entry in pairs(neutralTraits) do
+    for _, entry in ipairs(neutralTraits) do
         if numNeutralPerks > 0 then
             table.insert(perks, entry)
 
