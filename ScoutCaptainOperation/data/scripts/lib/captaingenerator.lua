@@ -13,7 +13,7 @@ end
 function CaptainGenerator:generateWithTraits(tier_in, level_in, primaryClass_in, secondaryClass_in, positiveTraits,
                                              negativeTraits, neutralTraits)
     if not positiveTraits and not negativeTraits and not neutralTraits then
-        return generate(self, tier_in, level_in, primaryClass_in, secondaryClass_in)
+        return self:generate(tier_in, level_in, primaryClass_in, secondaryClass_in)
     end
 
     positiveTraits = positiveTraits or {}

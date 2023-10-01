@@ -11,7 +11,7 @@ meta =
     name = "Scout Captain Operation",
 
     -- Title of your mod that will be displayed to players
-    title = "Scout Captain Operation",
+    title = "Scout Captain Operation v0.1.4",
 
     -- Type of your mod, either "mod" or "factionpack"
     type = "mod",
@@ -26,7 +26,7 @@ meta =
     -- This will be used to check for unmet dependencies or incompatibilities, and to check compatibility between clients and dedicated servers with mods.
     -- If a client with an unmatching major or minor mod version wants to log into a server, login is prohibited.
     -- Unmatching patch version still allows logging into a server. This works in both ways (server or client higher or lower version).
-    version = "0.1.3",
+    version = "0.1.4",
 
     -- If your mod requires dependencies, enter them here. The game will check that all dependencies given here are met.
     -- Possible attributes:
@@ -44,7 +44,7 @@ meta =
     --      {id = "OptionalMod", min = "0.2", optional = true}, -- we support OptionalMod optionally, starting at version 0.2
     -- },
     dependencies = {
-        {id = "Avorion", exact = "2.3.1"}
+        {id = "Avorion", min = "2.3.1"}
     },
 
     -- Set to true if the mod only has to run on the server. Clients will get notified that the mod is running on the server, but they won't download it to themselves
