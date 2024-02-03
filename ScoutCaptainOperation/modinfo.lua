@@ -58,5 +58,5 @@ meta =
     saveGameAltering = true,
 
     -- Contact info for other users to reach you in case they have questions
-    contact = "sineme.cs+Avorion@gmail.com",
+    contact = "sineme.cs+ScoutCaptainOperation@gmail.com",
 }
