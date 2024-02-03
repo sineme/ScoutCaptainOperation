@@ -11,7 +11,7 @@ meta =
     name = "Scout Captain Operation",
 
     -- Title of your mod that will be displayed to players
-    title = "Scout Captain Operation v0.1.4",
+    title = "Scout Captain Operation",
 
     -- Type of your mod, either "mod" or "factionpack"
     type = "mod",
