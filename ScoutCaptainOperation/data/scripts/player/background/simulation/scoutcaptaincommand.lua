@@ -485,7 +485,18 @@ end
 -- note: this function definition is optional and can be omitted if it's not required
 -- note: this may be called on a temporary instance of the command. all values written to "self" may not persist
 function ScoutCaptainCommand:isValidAreaSelection(ownerIndex, shipName, area, mouseCoordinates)
-    local player = Player(ownerIndex)
+    local faction = Faction(ownerIndex)
+
+    if faction.isPlayer then
+        faction = Player(ownerIndex)
+    elseif faction.isAlliance then
+        faction = Alliance(ownerIndex)
+    else
+        -- either it's an AIFaction who cannot use captain operations
+        -- or it is a type of owner that did not exist at the time 
+        -- of this writing
+        return false 
+    end
 
     -- a captain can only be found in stations
     -- and the ship's captain doesn't know more than the player
@@ -493,7 +504,7 @@ function ScoutCaptainCommand:isValidAreaSelection(ownerIndex, shipName, area, mo
     -- known sector with stations
     for x = area.lower.x, area.upper.x, 1 do
         for y = area.lower.y, area.upper.y, 1 do
-            local sectorView = player:getKnownSector(x, y)
+            local sectorView = faction:getKnownSector(x, y)
             if sectorView and sectorView.numStations > 0 then
                 return true
             end
@@ -1017,17 +1028,17 @@ function ScoutCaptainCommand:buildUI(startPressedCallback, changeAreaPressedCall
 
         -- TODO: display traits
         for i, trait in pairs(config.positiveTraits) do
-            traitIndex = indexOf(positiveTraits, trait)
+            local traitIndex = indexOf(positiveTraits, trait)
             ui.configUI.positiveTraitsComboBoxes[i]:setSelectedIndexNoCallback(traitIndex)
         end
 
         for i, trait in pairs(config.neutralTraits) do
-            traitIndex = indexOf(neutralTraits, trait)
+            local traitIndex = indexOf(neutralTraits, trait)
             ui.configUI.neutralTraitsComboBoxes[i]:setSelectedIndexNoCallback(traitIndex)
         end
 
         for i, trait in pairs(config.negativeTraits) do
-            traitIndex = indexOf(negativeTraits, trait)
+            local traitIndex = indexOf(negativeTraits, trait)
             ui.configUI.negativeTraitsComboBoxes[i]:setSelectedIndexNoCallback(traitIndex)
         end
     end
